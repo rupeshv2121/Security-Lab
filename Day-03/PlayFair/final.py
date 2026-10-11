@@ -1,0 +1,880 @@
+# ============================================================
+#              EXTENDED PLAYFAIR CIPHER
+#                     VERSION 8
+#
+# Features:
+# 1. User-selectable matrix size
+# 2. User-selectable filler
+# 3. Multiple Playfair rounds
+# 4. Key-dependent circular shift
+# 5. Reverse ciphertext
+# 6. Columnar Transposition
+# 7. Each modification can be enabled/disabled
+# ============================================================
+
+
+# ============================================================
+#                  CHARACTER SET
+# ============================================================
+
+def get_characters(size):
+
+    if size == 5:
+
+        # Classical Playfair
+        # I and J are combined
+        return "ABCDEFGHIKLMNOPQRSTUVWXYZ"
+
+    elif size == 6:
+
+        return "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+    elif size == 8:
+
+        return (
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"
+            "0123456789"
+            "!@"
+        )
+
+    elif size == 10:
+
+        characters = ""
+
+        # Printable ASCII characters
+        for i in range(32, 127):
+            characters += chr(i)
+
+        return characters
+
+    return ""
+
+
+# ============================================================
+#                  CREATE PLAYFAIR MATRIX
+# ============================================================
+
+def create_matrix(key, size):
+
+    characters = get_characters(size)
+
+    used = ""
+
+    # Special handling for classical 5x5 matrix
+    if size == 5:
+
+        key = key.upper()
+        key = key.replace('J', 'I')
+
+    # Put key characters first
+    for ch in key:
+
+        if ch in characters and ch not in used:
+            used += ch
+
+    # Add remaining characters
+    for ch in characters:
+
+        if ch not in used:
+            used += ch
+
+    matrix = []
+
+    for i in range(size):
+
+        row = []
+
+        for j in range(size):
+
+            index = i * size + j
+
+            if index < len(used):
+                row.append(used[index])
+            else:
+                row.append('\0')
+
+        matrix.append(row)
+
+    return matrix
+
+
+# ============================================================
+#                  DISPLAY MATRIX
+# ============================================================
+
+def display_matrix(matrix, size):
+
+    print("\n================ PLAYFAIR MATRIX ================")
+
+    for i in range(size):
+
+        for j in range(size):
+
+            ch = matrix[i][j]
+
+            if ch == ' ':
+
+                print("[SP]", end=" ")
+
+            elif ch == '\0':
+
+                print("[ ]", end=" ")
+
+            else:
+
+                print("[" + ch + "]", end=" ")
+
+        print()
+
+    print("==================================================")
+
+
+# ============================================================
+#                  FIND CHARACTER POSITION
+# ============================================================
+
+def find_position(matrix, size, ch):
+
+    if size == 5 and ch == 'J':
+        ch = 'I'
+
+    for i in range(size):
+
+        for j in range(size):
+
+            if matrix[i][j] == ch:
+                return i, j
+
+    return -1, -1
+
+
+# ============================================================
+#                  PREPARE PLAINTEXT
+# ============================================================
+
+def prepare_text(text, filler, size):
+
+    characters = get_characters(size)
+
+    clean_text = ""
+
+    # Classical 5x5
+    if size == 5:
+
+        text = text.upper()
+
+        for ch in text:
+
+            if 'A' <= ch <= 'Z':
+
+                if ch == 'J':
+                    ch = 'I'
+
+                clean_text += ch
+
+    # Other matrices
+    else:
+
+        for ch in text:
+
+            if ch in characters:
+                clean_text += ch
+
+    pairs = []
+
+    i = 0
+
+    while i < len(clean_text):
+
+        # Last character
+        if i == len(clean_text) - 1:
+
+            pairs.append(
+                clean_text[i] + filler
+            )
+
+            i += 1
+
+        # Repeated characters
+        elif clean_text[i] == clean_text[i + 1]:
+
+            pairs.append(
+                clean_text[i] + filler
+            )
+
+            i += 1
+
+        # Normal pair
+        else:
+
+            pairs.append(
+                clean_text[i] + clean_text[i + 1]
+            )
+
+            i += 2
+
+    return pairs
+
+
+# ============================================================
+#                  PLAYFAIR ENCRYPTION
+# ============================================================
+
+def playfair_encrypt(text, matrix, size):
+
+    ciphertext = ""
+
+    for i in range(0, len(text), 2):
+
+        a = text[i]
+        b = text[i + 1]
+
+        r1, c1 = find_position(
+            matrix, size, a
+        )
+
+        r2, c2 = find_position(
+            matrix, size, b
+        )
+
+        # Same row
+        if r1 == r2:
+
+            ciphertext += matrix[r1][
+                (c1 + 1) % size
+            ]
+
+            ciphertext += matrix[r2][
+                (c2 + 1) % size
+            ]
+
+        # Same column
+        elif c1 == c2:
+
+            ciphertext += matrix[
+                (r1 + 1) % size
+            ][c1]
+
+            ciphertext += matrix[
+                (r2 + 1) % size
+            ][c2]
+
+        # Rectangle
+        else:
+
+            ciphertext += matrix[r1][c2]
+            ciphertext += matrix[r2][c1]
+
+    return ciphertext
+
+
+# ============================================================
+#                  PLAYFAIR DECRYPTION
+# ============================================================
+
+def playfair_decrypt(text, matrix, size):
+
+    plaintext = ""
+
+    for i in range(0, len(text), 2):
+
+        a = text[i]
+        b = text[i + 1]
+
+        r1, c1 = find_position(
+            matrix, size, a
+        )
+
+        r2, c2 = find_position(
+            matrix, size, b
+        )
+
+        # Same row
+        if r1 == r2:
+
+            plaintext += matrix[r1][
+                (c1 - 1) % size
+            ]
+
+            plaintext += matrix[r2][
+                (c2 - 1) % size
+            ]
+
+        # Same column
+        elif c1 == c2:
+
+            plaintext += matrix[
+                (r1 - 1) % size
+            ][c1]
+
+            plaintext += matrix[
+                (r2 - 1) % size
+            ][c2]
+
+        # Rectangle
+        else:
+
+            plaintext += matrix[r1][c2]
+            plaintext += matrix[r2][c1]
+
+    return plaintext
+
+
+# ============================================================
+#              KEY-DEPENDENT SHIFT
+# ============================================================
+
+def calculate_key_shift(key, length):
+
+    if length == 0:
+        return 0
+
+    total = 0
+
+    for ch in key:
+
+        total += ord(ch)
+
+    return total % length
+
+
+# ============================================================
+#              CIRCULAR LEFT SHIFT
+# ============================================================
+
+def circular_left_shift(text, shift):
+
+    if len(text) == 0:
+        return text
+
+    shift = shift % len(text)
+
+    return text[shift:] + text[:shift]
+
+
+# ============================================================
+#              CIRCULAR RIGHT SHIFT
+# ============================================================
+
+def circular_right_shift(text, shift):
+
+    if len(text) == 0:
+        return text
+
+    shift = shift % len(text)
+
+    if shift == 0:
+        return text
+
+    return text[-shift:] + text[:-shift]
+
+
+# ============================================================
+#              COLUMNAR TRANSPOSITION
+# ============================================================
+
+def get_column_order(key):
+
+    columns = []
+
+    for i in range(len(key)):
+
+        columns.append(
+            (key[i], i)
+        )
+
+    # Sort by character.
+    # Original position handles duplicate characters.
+    columns.sort()
+
+    order = []
+
+    for item in columns:
+
+        order.append(item[1])
+
+    return order
+
+
+# ============================================================
+#              COLUMNAR ENCRYPTION
+# ============================================================
+
+def columnar_encrypt(text, key):
+
+    if len(key) == 0:
+        return text
+
+    columns = len(key)
+
+    rows = []
+
+    i = 0
+
+    while i < len(text):
+
+        row = []
+
+        for j in range(columns):
+
+            if i < len(text):
+
+                row.append(text[i])
+                i += 1
+
+            else:
+
+                break
+
+        rows.append(row)
+
+    order = get_column_order(key)
+
+    ciphertext = ""
+
+    # Read columns according to key order
+    for col in order:
+
+        for row in rows:
+
+            if col < len(row):
+
+                ciphertext += row[col]
+
+    return ciphertext
+
+
+# ============================================================
+#              COLUMNAR DECRYPTION
+# ============================================================
+
+def columnar_decrypt(text, key):
+
+    if len(key) == 0:
+        return text
+
+    columns = len(key)
+    length = len(text)
+
+    rows_count = (
+        length + columns - 1
+    ) // columns
+
+    # Number of characters in each column
+    column_lengths = []
+
+    remainder = length % columns
+
+    for col in range(columns):
+
+        if remainder == 0:
+
+            column_lengths.append(
+                rows_count
+            )
+
+        elif col < remainder:
+
+            column_lengths.append(
+                rows_count
+            )
+
+        else:
+
+            column_lengths.append(
+                rows_count - 1
+            )
+
+    order = get_column_order(key)
+
+    matrix = []
+
+    for i in range(columns):
+
+        matrix.append([])
+
+    index = 0
+
+    # Put ciphertext back column-wise
+    for col in order:
+
+        count = column_lengths[col]
+
+        for j in range(count):
+
+            matrix[col].append(
+                text[index]
+            )
+
+            index += 1
+
+    plaintext = ""
+
+    # Read row-wise
+    for row in range(rows_count):
+
+        for col in range(columns):
+
+            if row < len(matrix[col]):
+
+                plaintext += matrix[col][row]
+
+    return plaintext
+
+
+# ============================================================
+#                     MAIN PROGRAM
+# ============================================================
+
+print("================================================")
+print("          EXTENDED PLAYFAIR CIPHER")
+print("                 VERSION 8")
+print("================================================")
+
+
+# ============================================================
+#                     INPUT
+# ============================================================
+
+key = input("Enter Playfair key: ")
+
+plaintext = input("Enter plaintext: ")
+
+
+# ============================================================
+#                 MATRIX SELECTION
+# ============================================================
+
+print("\nSelect Matrix Size:")
+
+print("1. 5 x 5  -> A-Z")
+print("2. 6 x 6  -> A-Z + 0-9")
+print("3. 8 x 8  -> A-Z + a-z + 0-9 + symbols")
+print("4. 10 x 10 -> Printable ASCII")
+
+choice = input("Enter choice: ")
+
+
+if choice == '1':
+
+    size = 5
+
+elif choice == '2':
+
+    size = 6
+
+elif choice == '3':
+
+    size = 8
+
+elif choice == '4':
+
+    size = 10
+
+else:
+
+    print("Invalid choice.")
+    exit()
+
+
+characters = get_characters(size)
+
+
+# ============================================================
+#                     FILLER
+# ============================================================
+
+filler = input(
+    "\nEnter filler character: "
+)
+
+
+if len(filler) != 1:
+
+    print("Filler must be one character.")
+    exit()
+
+
+if filler not in characters:
+
+    print(
+        "Filler is not present "
+        "in the selected matrix."
+    )
+
+    exit()
+
+
+# ============================================================
+#                  CREATE MATRIX
+# ============================================================
+
+matrix = create_matrix(
+    key,
+    size
+)
+
+display_matrix(
+    matrix,
+    size
+)
+
+
+# ============================================================
+#                  PREPARE TEXT
+# ============================================================
+
+pairs = prepare_text(
+    plaintext,
+    filler,
+    size
+)
+
+prepared_text = ""
+
+for pair in pairs:
+
+    prepared_text += pair
+
+
+print("\nPrepared Plaintext:")
+print(prepared_text)
+
+
+# ============================================================
+#                MULTIPLE ROUNDS?
+# ============================================================
+
+choice = input(
+    "\nApply multiple Playfair rounds? (y/n): "
+)
+
+
+if choice.lower() == 'y':
+
+    rounds = int(
+        input("Enter number of rounds: ")
+    )
+
+    if rounds < 1:
+        rounds = 1
+
+else:
+
+    rounds = 1
+
+
+# ============================================================
+#                  PLAYFAIR
+# ============================================================
+
+ciphertext = prepared_text
+
+
+for i in range(rounds):
+
+    ciphertext = playfair_encrypt(
+        ciphertext,
+        matrix,
+        size
+    )
+
+    print(
+        "\nAfter Playfair Round",
+        i + 1,
+        ":"
+    )
+
+    print(ciphertext)
+
+
+# ============================================================
+#             KEY-DEPENDENT SHIFT?
+# ============================================================
+
+choice = input(
+    "\nApply key-dependent circular shift? (y/n): "
+)
+
+
+shift = 0
+
+
+if choice.lower() == 'y':
+
+    shift = calculate_key_shift(
+        key,
+        len(ciphertext)
+    )
+
+    print(
+        "\nKey-dependent shift value:",
+        shift
+    )
+
+    ciphertext = circular_left_shift(
+        ciphertext,
+        shift
+    )
+
+    print("\nAfter Circular Shift:")
+    print(ciphertext)
+
+
+# ============================================================
+#                     REVERSE?
+# ============================================================
+
+reverse_used = False
+
+
+choice = input(
+    "\nReverse ciphertext? (y/n): "
+)
+
+
+if choice.lower() == 'y':
+
+    reverse_used = True
+
+    ciphertext = ciphertext[::-1]
+
+    print("\nAfter Reversing:")
+    print(ciphertext)
+
+
+# ============================================================
+#             COLUMNAR TRANSPOSITION?
+# ============================================================
+
+transposition_used = False
+
+
+choice = input(
+    "\nApply Columnar Transposition? (y/n): "
+)
+
+
+if choice.lower() == 'y':
+
+    transposition_used = True
+
+    ciphertext = columnar_encrypt(
+        ciphertext,
+        key
+    )
+
+    print(
+        "\nAfter Columnar Transposition:"
+    )
+
+    print(ciphertext)
+
+
+# ============================================================
+#                  FINAL CIPHERTEXT
+# ============================================================
+
+print("\n================================================")
+print("               FINAL CIPHERTEXT")
+print("================================================")
+
+print(ciphertext)
+
+
+# ============================================================
+#                    DECRYPTION
+# ============================================================
+
+print("\n================================================")
+print("                  DECRYPTION")
+print("================================================")
+
+
+# ============================================================
+#          UNDO COLUMNAR TRANSPOSITION
+# ============================================================
+
+if transposition_used:
+
+    ciphertext = columnar_decrypt(
+        ciphertext,
+        key
+    )
+
+    print(
+        "\nAfter Undoing Columnar Transposition:"
+    )
+
+    print(ciphertext)
+
+
+# ============================================================
+#                     UNDO REVERSE
+# ============================================================
+
+if reverse_used:
+
+    ciphertext = ciphertext[::-1]
+
+    print("\nAfter Undoing Reversal:")
+    print(ciphertext)
+
+
+# ============================================================
+#              UNDO CIRCULAR SHIFT
+# ============================================================
+
+if shift != 0:
+
+    ciphertext = circular_right_shift(
+        ciphertext,
+        shift
+    )
+
+    print(
+        "\nAfter Undoing Circular Shift:"
+    )
+
+    print(ciphertext)
+
+
+# ============================================================
+#              PLAYFAIR DECRYPTION
+# ============================================================
+
+decrypted_text = ciphertext
+
+
+for i in range(rounds):
+
+    decrypted_text = playfair_decrypt(
+        decrypted_text,
+        matrix,
+        size
+    )
+
+    print(
+        "\nAfter Playfair Decryption Round",
+        rounds - i,
+        ":"
+    )
+
+    print(decrypted_text)
+
+
+# ============================================================
+#                  FINAL PLAINTEXT
+# ============================================================
+
+print("\n================================================")
+print("                FINAL PLAINTEXT")
+print("================================================")
+
+print(decrypted_text)
+
+
+print("\n================================================")
+print("                    END")
+print("================================================")
